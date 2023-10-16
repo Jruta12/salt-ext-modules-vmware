@@ -4015,3 +4015,64 @@ def get_vmotion_enabled(
             ret.update({host.name: {"VMotion Enabled": False}})
 
     return ret
+
+def _get_vc_list(config):
+    vmw_configs = config.get("pillar", {}).get("saltext.vmware")
+    vc_configs = vmw_configs.get("vcenters")
+    vc_list = vc_configs.keys()
+    return vc_configs, vc_list
+
+def _vc_appliance_client(conf=None):
+    vc_creds = _get_vc_credential(conf)
+    return VcApplianceClient(vc_access=vc_creds)
+
+def _get_vc_credential(conf=None):
+    config = __opts__
+    if not conf:
+        conf = get_config(config)
+    log.info("connection properties %s", conf)
+    log.info("Retrieving current config for VC host %s", conf["host"])
+    return VcenterCredentials(hostname=conf["host"], username=conf["user"], password=conf["password"],
+                              ssl_thumbprint=conf["ssl_thumbprint"])
+
+def _vlcm_cluster_config(vc, vc_cred, action):
+    vcenter_client = _vc_vcenter_client(vc_cred)
+    vlcm_client = _vc_vlcm_client(vc_cred)
+    clusters = vcenter_client.get_clusters()
+    esx = {}
+    for cluster in clusters:
+        log.info("Cluster %s", cluster)
+        if vlcm_client.is_vlcm_config_manager_enabled_on_cluster(cluster["cluster"]):
+            vlcm_content = action(cluster,
+                                  vlcm_client)  # vlcm_client.extract_cluster_current_config(cluster["cluster"])
+            esx[cluster["name"]] = vlcm_content
+    return esx
+
+
+def check_compliance_vc():
+    """
+    Check complaince.
+    """
+
+    config = __opts__
+    vc_configs, vc_list = _get_vc_list(config)
+    out = {}
+
+    def cluster_check_compliance(cluster, vlcm_client):
+        return vlcm_client.check_compliance_cluster_configuration(cluster["cluster"])
+
+    for vc in vc_list:
+        vc_cred = vc_configs.get(vc)
+        vc_appliance_client = _vc_appliance_client(vc_cred)
+        task_id = vc_appliance_client.check_for_drift(1)
+        log.info("Compliance check initiated. Task Id %s", task_id)
+        time.sleep(10)
+        vc_cis_client = VcCisClient(vc_access=_get_vc_credential())
+        vc_check = vc_cis_client.get_task(task_id)
+
+        out[vc] = {"vc": vc_check}
+        
+        out[vc]["esx"] = _vlcm_cluster_config(vc, vc_cred, cluster_check_compliance)
+
+    return out
+
