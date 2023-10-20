@@ -11,9 +11,9 @@ import saltext.vmware.utils.esxi as utils_esxi
 import saltext.vmware.utils.vsphere as utils_vmware
 from config_modules_vmware.esxi.esx_config import EsxConfig
 from config_modules_vmware.esxi.esx_context import EsxContext
-from config_modules_vmware.lib.common.credentials import SddcCredentials
-from config_modules_vmware.lib.common.credentials import VcenterCredentials
 from salt.defaults import DEFAULT_TARGET_DELIM
+from config_modules_vmware.lib.common.credentials import VcenterCredentials, SddcCredentials
+
 from saltext.vmware.utils.connect import get_config
 
 log = logging.getLogger(__name__)
@@ -4094,3 +4094,40 @@ def get_desired_config(profile=None, cluster_path=None, esx_config=None):
         cluster_moid=cluster_moid
     )
     return {cluster_path: cluster_config}
+
+
+def _get_vc_credential(conf=None):
+    config = __opts__
+    if not conf:
+        conf = get_config(config)
+    log.info("connection properties %s", conf)
+    log.info("Retrieving current config for VC host %s", conf["host"])
+    return VcenterCredentials(hostname=conf["host"], username=conf["user"], password=conf["password"],
+                              ssl_thumbprint=conf["ssl_thumbprint"])
+
+def check_compliance(desired_state_config):
+    log.info("Checking complaince ");
+    vc_creds = _get_vc_credential()
+    sddc_creds = SddcCredentials(vc_creds=vc_creds)
+    esx_context = EsxContext(sddc_creds)
+    with esx_context:
+        driftreport = EsxConfig(context=esx_context).check_compliance(self, desired_state_spec: dict = None, cluster_paths: List[str] = None)     # invoking config module library function
+        return driftreport
+    
+# Execution module function to run pre-check for remediate workflow
+def pre_check_remediate(desired_state_config):
+    vc_creds = _get_vc_credential()                                                   # this will get the right vc credentials based on the cluster
+    sddc_creds = SddcCredentials(vc_creds=vc_creds)
+    esx_context = EsxContext(sddc_creds)
+    with esx_context:
+        pre_check_response = EsxConfig(context=esx_context).pre_check_remediate(desired_state_config, cluster)     # invoking config module library function
+        return pre_check_response
+  
+# Execution module function to run remediate workflow
+def remediate_drifts(desired_state_config):
+    vc_creds = _get_vc_credential()                                                 # this will get the right vc credentials based on the cluster
+    sddc_creds = SddcCredentials(vc_creds=vc_creds)
+    esx_context = EsxContext(sddc_creds)
+    with esx_context:
+        response = EsxConfig(context=esx_context).remediate_drifts(desired_state_config, cluster)     # invoking config module library function
+        return response
