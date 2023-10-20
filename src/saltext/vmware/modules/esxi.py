@@ -4106,12 +4106,12 @@ def _get_vc_credential(conf=None):
                               ssl_thumbprint=conf["ssl_thumbprint"])
 
 def check_compliance(desired_state_config):
-    log.info("Checking complaince ");
+    log.info("Checking complaince ")
     vc_creds = _get_vc_credential()
     sddc_creds = SddcCredentials(vc_creds=vc_creds)
     esx_context = EsxContext(sddc_creds)
     with esx_context:
-        driftreport = EsxConfig(context=esx_context).check_compliance(self, desired_state_spec: dict = None, cluster_paths: List[str] = None)     # invoking config module library function
+        driftreport = EsxConfig(context=esx_context).check_compliance(desired_state_spec: dict = None, cluster_paths: List[str] = None)     # invoking config module library function
         return driftreport
     
 # Execution module function to run pre-check for remediate workflow
@@ -4120,7 +4120,7 @@ def pre_check_remediate(desired_state_config):
     sddc_creds = SddcCredentials(vc_creds=vc_creds)
     esx_context = EsxContext(sddc_creds)
     with esx_context:
-        pre_check_response = EsxConfig(context=esx_context).pre_check_remediate(desired_state_config, cluster)     # invoking config module library function
+        pre_check_response = EsxConfig(context=esx_context).precheck_desired_state(self, desired_state_spec=None, cluster_paths: List[str] = None)     # invoking config module library function
         return pre_check_response
   
 # Execution module function to run remediate workflow
@@ -4129,5 +4129,5 @@ def remediate_drifts(desired_state_config):
     sddc_creds = SddcCredentials(vc_creds=vc_creds)
     esx_context = EsxContext(sddc_creds)
     with esx_context:
-        response = EsxConfig(context=esx_context).remediate_drifts(desired_state_config, cluster)     # invoking config module library function
+        response = EsxConfig(context=esx_context).remediate_with_desired_state(self, desired_state_spec=None, cluster_paths: List[str] = None)     # invoking config module library function
         return response
